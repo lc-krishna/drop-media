@@ -1,26 +1,23 @@
 import { useState } from "react";
-import { Lock } from "lucide-react";
+import { Eye, EyeOff, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { markLoggedIn } from "@/lib/login";
 
-const AUTH_KEY = "lc_auth";
 const VALID_USER = "admin";
 const VALID_PASS = "admin@123";
-
-export function isLoggedIn() {
-  return localStorage.getItem(AUTH_KEY) === "1";
-}
 
 export function LoginModal({ onSuccess }: { onSuccess: () => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (username === VALID_USER && password === VALID_PASS) {
-      localStorage.setItem(AUTH_KEY, "1");
+      markLoggedIn();
       onSuccess();
     } else {
       setError(true);
@@ -37,9 +34,7 @@ export function LoginModal({ onSuccess }: { onSuccess: () => void }) {
             </div>
           </div>
           <h1 className="text-xl font-semibold">Lucky Communities</h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to access the upload tool
-          </p>
+          <p className="text-sm text-muted-foreground">Sign in to access the upload tool</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -60,23 +55,30 @@ export function LoginModal({ onSuccess }: { onSuccess: () => void }) {
 
           <div className="space-y-2">
             <Label htmlFor="lc-password">Password</Label>
-            <Input
-              id="lc-password"
-              type="password"
-              value={password}
-              autoComplete="current-password"
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError(false);
-              }}
-            />
+            <div className="relative">
+              <Input
+                id="lc-password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                autoComplete="current-password"
+                className="pr-10"
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError(false);
+                }}
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((value) => !value)}
+                className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive">
-              Invalid username or password.
-            </p>
-          )}
+          {error && <p className="text-sm text-destructive">Invalid username or password.</p>}
 
           <Button type="submit" className="w-full">
             Sign in

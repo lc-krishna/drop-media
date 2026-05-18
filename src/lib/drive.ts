@@ -1,4 +1,5 @@
 export type DriveFolder = { id: string; name: string };
+export type DriveFile = { id: string; name: string };
 
 async function driveApi<T>(body: Record<string, unknown>): Promise<T> {
   const res = await fetch("/api/drive", {
@@ -28,6 +29,29 @@ export async function createFolder(name: string, parentId: string): Promise<Driv
     parentId,
   });
   return data.folder;
+}
+
+async function verifyUploadedFile(filename: string, parentId: string): Promise<string | null> {
+  const data = await driveApi<{ file: DriveFile | null }>({
+    action: "verifyUploadedFile",
+    filename,
+    parentId,
+  });
+  return data.file?.id ?? null;
+}
+
+async function verifyUploadedFileWithRetry(
+  filename: string,
+  parentId: string,
+): Promise<string | null> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 800 * attempt));
+    }
+    const driveId = await verifyUploadedFile(filename, parentId);
+    if (driveId) return driveId;
+  }
+  return null;
 }
 
 export async function findChildByName(parentId: string, name: string): Promise<DriveFolder | null> {
@@ -96,6 +120,11 @@ async function uploadResumable(
         }
         throw new Error(`Chunk failed: ${res.status} ${await res.text()}`);
       } catch (err) {
+        const verifiedDriveId = await verifyUploadedFileWithRetry(filename, parentId);
+        if (verifiedDriveId) {
+          onProgress?.(100);
+          return verifiedDriveId;
+        }
         attempt++;
         if (attempt >= 3) throw err;
         await new Promise((r) => setTimeout(r, 1000 * attempt));

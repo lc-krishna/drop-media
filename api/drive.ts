@@ -19,6 +19,7 @@ type VercelResponse = {
 };
 
 type DriveFolder = { id: string; name: string };
+type DriveFile = { id: string; name: string };
 
 const BASE = "https://www.googleapis.com/drive/v3";
 const UPLOAD = "https://www.googleapis.com/upload/drive/v3";
@@ -111,6 +112,10 @@ function requireString(body: Record<string, unknown>, key: string): string {
   return value;
 }
 
+function driveQueryString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
 async function listFolders(parentId: string): Promise<DriveFolder[]> {
   const q = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
   const url = `${BASE}/files?q=${encodeURIComponent(
@@ -135,6 +140,19 @@ async function createFolder(name: string, parentId: string): Promise<DriveFolder
   if (!res.ok) throw new Error(`createFolder failed: ${await res.text()}`);
   const data = (await res.json()) as DriveFolder;
   return { id: data.id, name: data.name };
+}
+
+async function findFileByName(parentId: string, name: string): Promise<DriveFile | null> {
+  const q = `'${driveQueryString(parentId)}' in parents and name='${driveQueryString(
+    name,
+  )}' and trashed=false`;
+  const url = `${BASE}/files?q=${encodeURIComponent(
+    q,
+  )}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true&pageSize=1&orderBy=modifiedTime desc`;
+  const res = await fetch(url, { headers: await authHeaders() });
+  if (!res.ok) throw new Error(`findFileByName failed: ${await res.text()}`);
+  const data = (await res.json()) as { files?: DriveFile[] };
+  return data.files?.[0] ?? null;
 }
 
 async function createUploadSession(body: Record<string, unknown>) {
@@ -189,6 +207,16 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
     if (action === "createUploadSession") {
       response.status(200).json(await createUploadSession(body));
+      return;
+    }
+
+    if (action === "verifyUploadedFile") {
+      response.status(200).json({
+        file: await findFileByName(
+          requireString(body, "parentId"),
+          requireString(body, "filename"),
+        ),
+      });
       return;
     }
 

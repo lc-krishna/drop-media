@@ -9,10 +9,11 @@ import { FileGrid, type StagedFile } from "./FileGrid";
 import { FolderNavigator } from "./FolderNavigator";
 import { UploadProgress } from "./UploadProgress";
 import { SettingsModal } from "./SettingsModal";
-import { LoginModal, isLoggedIn } from "./LoginModal";
+import { LoginModal } from "./LoginModal";
 import { useFolderTree } from "@/hooks/useFolderTree";
 import { useUploadSession } from "@/hooks/useUploadSession";
 import { isConfigured } from "@/lib/auth";
+import { isLoggedIn } from "@/lib/login";
 
 type Park = { id: number; park: string; folderId: string };
 
