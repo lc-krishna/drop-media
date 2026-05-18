@@ -14,7 +14,7 @@ export type UploadSession = {
 const HISTORY_KEY = "upload_history";
 const SA_KEY = "sa_json_b64";
 
-// Fallback: service account JSON baked in at build time via VITE_SA_JSON_B64 env var.
+// Service account JSON baked in at build time via VITE_SA_JSON_B64 env var.
 // Set this in .env locally or in the Netlify / Vercel dashboard.
 function envSA(): string | null {
   const b64 = import.meta.env.VITE_SA_JSON_B64 as string | undefined;
@@ -49,13 +49,15 @@ export const storage = {
     localStorage.removeItem(HISTORY_KEY);
   },
   getServiceAccount(): string | null {
-    if (typeof localStorage === "undefined") return envSA();
+    const env = envSA();
+    if (env) return env;
+    if (typeof localStorage === "undefined") return null;
     const v = localStorage.getItem(SA_KEY);
-    if (!v) return envSA();
+    if (!v) return null;
     try {
       return atob(v);
     } catch {
-      return envSA();
+      return null;
     }
   },
   setServiceAccount(json: string) {

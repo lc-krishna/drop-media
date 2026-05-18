@@ -39,6 +39,18 @@ export function PhotosVideosApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const targetFolder = tree.crumbs[tree.crumbs.length - 1];
+  const folderPath = useMemo(
+    () =>
+      tree.crumbs
+        .slice(1)
+        .map((c) => c.name)
+        .join(" > ") ||
+      tree.crumbs[0]?.name ||
+      "",
+    [tree.crumbs],
+  );
+
   if (!authenticated) {
     return <LoginModal onSuccess={() => setAuthenticated(true)} />;
   }
@@ -57,7 +69,8 @@ export function PhotosVideosApp() {
     setStaged((s) => [...s, ...next]);
 
     const oversized = files.filter((f) => f.size > 5 * 1024 * 1024 * 1024);
-    if (oversized.length) toast.warning(`${oversized.length} file(s) over 5GB — uploads may take a while.`);
+    if (oversized.length)
+      toast.warning(`${oversized.length} file(s) over 5GB — uploads may take a while.`);
   };
 
   const removeFile = (id: string) =>
@@ -70,15 +83,16 @@ export function PhotosVideosApp() {
   const updateName = (id: string, name: string) =>
     setStaged((s) => s.map((f) => (f.id === id ? { ...f, name } : f)));
 
-  const targetFolder = tree.crumbs[tree.crumbs.length - 1];
-  const folderPath = useMemo(
-    () => tree.crumbs.slice(1).map((c) => c.name).join(" > ") || tree.crumbs[0]?.name || "",
-    [tree.crumbs],
-  );
-
-  const namesValid = applyAll ? bulkName.trim().length > 0 : staged.every((f) => f.name.trim().length > 0);
+  const namesValid = applyAll
+    ? bulkName.trim().length > 0
+    : staged.every((f) => f.name.trim().length > 0);
   const canUpload =
-    !!park && !!targetFolder && tree.crumbs.length >= 2 && staged.length > 0 && namesValid && !session.uploading;
+    !!park &&
+    !!targetFolder &&
+    tree.crumbs.length >= 2 &&
+    staged.length > 0 &&
+    namesValid &&
+    !session.uploading;
 
   const handleUpload = async () => {
     if (!isConfigured()) {
@@ -151,7 +165,8 @@ export function PhotosVideosApp() {
             {needsSetup && (
               <div className="border border-amber-300 bg-amber-50 rounded-lg p-4 flex items-center justify-between gap-3">
                 <div className="text-sm">
-                  <strong>Setup required:</strong> paste your Google service account JSON to connect to Drive.
+                  <strong>Setup required:</strong> paste your Google service account JSON to connect
+                  to Drive.
                 </div>
                 <Button size="sm" onClick={() => setSettingsOpen(true)}>
                   Open settings
@@ -178,11 +193,7 @@ export function PhotosVideosApp() {
             )}
 
             <Section number={3} title="Pick Destination Folder">
-              <FolderNavigator
-                tree={tree}
-                selectedPark={park}
-                setSelectedPark={setPark}
-              />
+              <FolderNavigator tree={tree} selectedPark={park} setSelectedPark={setPark} />
             </Section>
 
             {session.items.length > 0 && <UploadProgress items={session.items} />}
@@ -197,7 +208,10 @@ export function PhotosVideosApp() {
                 <UploadIcon className="h-4 w-4 mr-2" />
                 {session.uploading
                   ? "Uploading…"
-                  : `Upload ${staged.length || ""} ${staged.length === 1 ? "File" : "Files"} to Drive`.replace(/\s+/g, " ")}
+                  : `Upload ${staged.length || ""} ${staged.length === 1 ? "File" : "Files"} to Drive`.replace(
+                      /\s+/g,
+                      " ",
+                    )}
               </Button>
             </div>
           </TabsContent>
