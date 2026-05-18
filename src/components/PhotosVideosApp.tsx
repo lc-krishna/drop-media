@@ -34,14 +34,14 @@ export function PhotosVideosApp() {
     if (!isConfigured()) setNeedsSetup(true);
   }, []);
 
-  if (!authenticated) {
-    return <LoginModal onSuccess={() => setAuthenticated(true)} />;
-  }
-
   useEffect(() => {
     return () => staged.forEach((s) => URL.revokeObjectURL(s.url));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (!authenticated) {
+    return <LoginModal onSuccess={() => setAuthenticated(true)} />;
+  }
 
   const addFiles = (files: File[]) => {
     const next: StagedFile[] = files.map((f) => {
