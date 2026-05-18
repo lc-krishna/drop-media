@@ -53,8 +53,16 @@ export function SettingsModal({
             onClick={() => {
               if (confirm("Clear all upload history?")) {
                 storage.clearHistory();
-                onCleared();
-                toast.success("History cleared");
+                storage
+                  .clearRemoteHistory()
+                  .then(() => {
+                    onCleared();
+                    toast.success("History cleared");
+                  })
+                  .catch((error) => {
+                    onCleared();
+                    toast.error((error as Error).message);
+                  });
               }
             }}
           >

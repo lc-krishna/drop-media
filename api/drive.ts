@@ -20,9 +20,21 @@ type VercelResponse = {
 
 type DriveFolder = { id: string; name: string };
 type DriveFile = { id: string; name: string };
+type UploadLogRow = {
+  serialNo: string;
+  date: string;
+  noOfFiles: number;
+  filesName: string;
+  status: string;
+};
 
 const BASE = "https://www.googleapis.com/drive/v3";
 const UPLOAD = "https://www.googleapis.com/upload/drive/v3";
+const SHEETS = "https://sheets.googleapis.com/v4/spreadsheets";
+const HISTORY_SHEET_ID =
+  process.env.HISTORY_SHEET_ID ?? "1ANVcZPpyVrFkRhk2VtJmeB5AV-SZidPB_lj2Yu66ywo";
+const HISTORY_RANGE = "A:E";
+const HISTORY_APPEND_RANGE = "A:E";
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
@@ -48,7 +60,10 @@ async function signJWT(sa: ServiceAccount): Promise<string> {
   return new SignJWT({
     iss: sa.client_email,
     aud: sa.token_uri ?? "https://oauth2.googleapis.com/token",
-    scope: "https://www.googleapis.com/auth/drive",
+    scope: [
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/spreadsheets",
+    ].join(" "),
   })
     .setProtectedHeader({ alg: "RS256", typ: "JWT", kid: sa.private_key_id })
     .setIssuedAt(now)
@@ -110,6 +125,23 @@ function requireString(body: Record<string, unknown>, key: string): string {
     throw new Error(`Missing ${key}.`);
   }
   return value;
+}
+
+function optionalString(body: Record<string, unknown>, key: string): string {
+  const value = body[key];
+  return typeof value === "string" ? value : "";
+}
+
+function requireStringArray(body: Record<string, unknown>, key: string): string[] {
+  const value = body[key];
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.some((item) => typeof item !== "string")
+  ) {
+    throw new Error(`Missing ${key}.`);
+  }
+  return value as string[];
 }
 
 function driveQueryString(value: string): string {
@@ -181,6 +213,60 @@ async function createUploadSession(body: Record<string, unknown>) {
   return { uploadUrl };
 }
 
+async function getUploadHistory(): Promise<UploadLogRow[]> {
+  const url = `${SHEETS}/${HISTORY_SHEET_ID}/values/${encodeURIComponent(HISTORY_RANGE)}`;
+  const res = await fetch(url, { headers: await authHeaders() });
+  if (!res.ok) throw new Error(`getUploadHistory failed: ${await res.text()}`);
+  const data = (await res.json()) as { values?: string[][] };
+  const rows = data.values ?? [];
+  return rows
+    .slice(1)
+    .filter((row) => row.some(Boolean))
+    .map((row, index) => ({
+      serialNo: row[0] || String(index + 1),
+      date: row[1] || "",
+      noOfFiles: Number(row[2] || 0),
+      filesName: row[3] || "",
+      status: row[4] || "",
+    }))
+    .reverse();
+}
+
+async function appendUploadHistory(body: Record<string, unknown>) {
+  const files = requireStringArray(body, "files");
+  const status = requireString(body, "status");
+  const date = optionalString(body, "date") || new Date().toISOString();
+
+  const history = await getUploadHistory();
+  const maxSerial = history.reduce((max, row) => {
+    const value = Number(row.serialNo);
+    return Number.isFinite(value) ? Math.max(max, value) : max;
+  }, 0);
+
+  const url = `${SHEETS}/${HISTORY_SHEET_ID}/values/${encodeURIComponent(
+    HISTORY_APPEND_RANGE,
+  )}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: await authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      values: [[String(maxSerial + 1), date, files.length, files.join("\n"), status]],
+    }),
+  });
+  if (!res.ok) throw new Error(`appendUploadHistory failed: ${await res.text()}`);
+  return { ok: true };
+}
+
+async function clearUploadHistory() {
+  const url = `${SHEETS}/${HISTORY_SHEET_ID}/values/${encodeURIComponent("A2:E")}:clear`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: await authHeaders({ "Content-Type": "application/json" }),
+  });
+  if (!res.ok) throw new Error(`clearUploadHistory failed: ${await res.text()}`);
+  return { ok: true };
+}
+
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   response.setHeader("Cache-Control", "no-store");
 
@@ -217,6 +303,21 @@ export default async function handler(request: VercelRequest, response: VercelRe
           requireString(body, "filename"),
         ),
       });
+      return;
+    }
+
+    if (action === "getUploadHistory") {
+      response.status(200).json({ history: await getUploadHistory() });
+      return;
+    }
+
+    if (action === "appendUploadHistory") {
+      response.status(200).json(await appendUploadHistory(body));
+      return;
+    }
+
+    if (action === "clearUploadHistory") {
+      response.status(200).json(await clearUploadHistory());
       return;
     }
 

@@ -13,7 +13,10 @@ export function useUploadSession() {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    setHistory(storage.getHistory());
+    storage
+      .fetchHistory()
+      .then(setHistory)
+      .catch(() => setHistory(storage.getHistory()));
   }, []);
 
   useEffect(() => {
@@ -26,7 +29,12 @@ export function useUploadSession() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [uploading]);
 
-  const refresh = useCallback(() => setHistory(storage.getHistory()), []);
+  const refresh = useCallback(() => {
+    storage
+      .fetchHistory()
+      .then(setHistory)
+      .catch(() => setHistory(storage.getHistory()));
+  }, []);
 
   const start = useCallback(
     async (opts: {
@@ -81,21 +89,15 @@ export function useUploadSession() {
           while (active < MAX_PARALLEL && cursor < queue.length) {
             const { f, i } = queue[cursor++];
             active++;
-            setItems((arr) =>
-              arr.map((x) => (x.id === f.id ? { ...x, status: "uploading" } : x)),
-            );
+            setItems((arr) => arr.map((x) => (x.id === f.id ? { ...x, status: "uploading" } : x)));
             uploadFile(f.file, finalNames[i], opts.folderId, (pct) => {
-              setItems((arr) =>
-                arr.map((x) => (x.id === f.id ? { ...x, progress: pct } : x)),
-              );
+              setItems((arr) => arr.map((x) => (x.id === f.id ? { ...x, progress: pct } : x)));
             })
               .then((driveId) => {
                 doneCount++;
                 session.files[i] = { ...session.files[i], status: "done", driveFileId: driveId };
                 setItems((arr) =>
-                  arr.map((x) =>
-                    x.id === f.id ? { ...x, progress: 100, status: "done" } : x,
-                  ),
+                  arr.map((x) => (x.id === f.id ? { ...x, progress: 100, status: "done" } : x)),
                 );
               })
               .catch((err) => {
@@ -103,9 +105,7 @@ export function useUploadSession() {
                 session.files[i] = { ...session.files[i], status: "failed" };
                 setItems((arr) =>
                   arr.map((x) =>
-                    x.id === f.id
-                      ? { ...x, status: "failed", error: (err as Error).message }
-                      : x,
+                    x.id === f.id ? { ...x, status: "failed", error: (err as Error).message } : x,
                   ),
                 );
               })
@@ -115,7 +115,10 @@ export function useUploadSession() {
                   session.status =
                     failCount === 0 ? "done" : doneCount === 0 ? "failed" : "partial";
                   storage.upsertSession(session);
-                  refresh();
+                  storage
+                    .appendHistory(session)
+                    .then(refresh)
+                    .catch(() => refresh());
                   resolve();
                 } else {
                   next();
