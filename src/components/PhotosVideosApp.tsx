@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Settings, Upload as UploadIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export function PhotosVideosApp() {
   const [park, setPark] = useState<Park | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
+  const uploadPaneRef = useRef<HTMLDivElement>(null);
 
   const tree = useFolderTree();
   const session = useUploadSession();
@@ -95,6 +96,19 @@ export function PhotosVideosApp() {
     namesValid &&
     !session.uploading;
 
+  const resetWorkspace = () => {
+    staged.forEach((s) => URL.revokeObjectURL(s.url));
+    setStaged([]);
+    setBulkName("");
+    setApplyAll(false);
+    setPark(null);
+    tree.reset();
+    session.clearItems();
+    requestAnimationFrame(() => {
+      uploadPaneRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
+
   const handleUpload = async () => {
     if (!isConfigured()) {
       setSettingsOpen(true);
@@ -122,11 +136,7 @@ export function PhotosVideosApp() {
       else toast.error("Upload failed");
       // reset on full success
       if (result.status === "done") {
-        staged.forEach((s) => URL.revokeObjectURL(s.url));
-        setStaged([]);
-        setBulkName("");
-        setApplyAll(false);
-        setTimeout(() => session.clearItems(), 1500);
+        resetWorkspace();
       }
     } catch (e) {
       toast.error((e as Error).message);
@@ -162,7 +172,11 @@ export function PhotosVideosApp() {
             </TabsList>
           </div>
 
-          <TabsContent value="pv" className="flex-1 overflow-y-auto p-6 space-y-8 mt-0">
+          <TabsContent
+            ref={uploadPaneRef}
+            value="pv"
+            className="flex-1 overflow-y-auto p-6 space-y-8 mt-0"
+          >
             {needsSetup && (
               <div className="border border-amber-300 bg-amber-50 rounded-lg p-4 flex items-center justify-between gap-3">
                 <div className="text-sm">
